@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum Level {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum BacklogStatus {
+  IDEA
+  STUDY
+  POC
+  IN_PROGRESS
+  IN_PRODUCTION
+  ABANDONED
+}
+
+enum ProjectStatus {
+  IDEA
+  STUDY
+  POC
+  IN_PROGRESS
+  IN_PRODUCTION
+  ON_HOLD
+  ABANDONED
+}
+
+enum Frequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+}
+
+enum ActionStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  employeeId   String?  @unique
+  name         String
+  passwordHash String
+  role         Role     @default(VIEWER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  backlogOwned     BacklogItem[] @relation("BacklogOwner")
+  backlogUpdated   BacklogItem[] @relation("BacklogUpdater")
+  projectsLead     Project[]     @relation("ProjectLead")
+  projectsUpdated  Project[]     @relation("ProjectUpdater")
+  kpisUpdated      KPI[]         @relation("KPIUpdater")
+  actionsOwned     CommitteeAction[]
+  meetingsUpdated  CommitteeMeeting[] @relation("MeetingUpdater")
+}
+
+model BacklogItem {
+  id              String        @id @default(cuid())
+  readableId      String        @unique
+  businessDomain  String
+  painPoint       String
+  useCaseDesc     String
+  impact          Level
+  effort          Level
+  risk            Level
+  priorityScore   Int
+  priorityBand    String
+  status          BacklogStatus @default(IDEA)
+  committeeDate   DateTime?
+  ownerId         String?
+  updatedById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  owner       User?    @relation("BacklogOwner", fields: [ownerId], references: [id])
+  updatedBy   User?    @relation("BacklogUpdater", fields: [updatedById], references: [id])
+  projects    Project[]
+}
+
+model Project {
+  id              String       @id @default(cuid())
+  name            String
+  backlogItemId   String?
+  sponsor         String
+  sponsorUserId   String?
+  aiLeadId        String?
+  status          ProjectStatus @default(IDEA)
+  progress        Int
+  estimatedHours  Float
+  estimatedEuro   Float
+  actualHours     Float?
+  actualEuro      Float?
+  startDate       DateTime
+  targetDate      DateTime
+  alerts          String?
+  updatedById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  backlogItem BacklogItem? @relation(fields: [backlogItemId], references: [id])
+  aiLead      User?        @relation("ProjectLead", fields: [aiLeadId], references: [id])
+  updatedBy   User?        @relation("ProjectUpdater", fields: [updatedById], references: [id])
+}
+
+model KPI {
+  id             String    @id @default(cuid())
+  name           String
+  definition     String
+  method         String
+  frequency      Frequency
+  currentValue   Float
+  targetValue    Float
+  isPercentage   Boolean   @default(false)
+  source         String
+  updatedById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  updatedBy User? @relation("KPIUpdater", fields: [updatedById], references: [id])
+}
+
+model CommitteeMeeting {
+  id            String   @id @default(cuid())
+  meetingDate   DateTime
+  topics        String
+  decisions     String
+  arbitrations  String?
+  links         String?
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  actions   CommitteeAction[]
+  updatedBy User? @relation("MeetingUpdater", fields: [updatedById], references: [id])
+}
+
+model CommitteeAction {
+  id          String       @id @default(cuid())
+  meetingId   String
+  action      String
+  ownerId     String?
+  dueDate     DateTime
+  status      ActionStatus @default(TODO)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  meeting CommitteeMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  owner   User?            @relation(fields: [ownerId], references: [id])
+}
